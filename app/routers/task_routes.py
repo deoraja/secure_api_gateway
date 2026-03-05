@@ -2,10 +2,12 @@ from fastapi import APIRouter,Depends
 from app.core.dependencies import get_current_user
 from app.models.task_model import Task
 from app.services.task_service import create_task, get_all_tasks, get_task_by_id, delete_task
+from fastapi import HTTPException
 
 router = APIRouter()
 
 tasks = []
+
 @router.post("/tasks")
 def create_task(task: Task, user=Depends(get_current_user)):
 
@@ -22,13 +24,12 @@ def get_tasks(user=Depends(get_current_user)):
     return tasks
 
 @router.get("/tasks/{task_id}")
-def get_task(task_id: int):
+def get_task(task_id: int,user = Depends(get_current_user)):
 
     task = get_task_by_id(task_id)
 
     if not task:
-        return {"error": "Task not found"}
-
+       raise HTTPException(status_code=404, detail="Task not found")
     return task
 
 @router.delete("/tasks/{task_id}")
@@ -39,4 +40,4 @@ def delete_task(task_id: int, user=Depends(get_current_user)):
             tasks.remove(task)
             return {"message": "task deleted"}
 
-    return {"error": "task not found"}
+    raise HTTPException(status_code=404, detail="Task not found")
