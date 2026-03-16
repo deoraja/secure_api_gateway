@@ -1,8 +1,9 @@
 tasks = []
 
-def create_task(task):
-    task_data = task.dict()
+def create_task(task,owner):
+    task_data = task.model_dump()
     task_data["id"] = len(tasks) + 1
+    task_data["owner"] = owner
     tasks.append(task_data)
     return task_data
 

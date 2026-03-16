@@ -10,8 +10,9 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username = payload.get("sub")
+        token_type = payload.get("type")
 
-        if username is None:
+        if username is None or token_type != "access":
             raise HTTPException(status_code=401, detail="Invalid token")
 
         return username
