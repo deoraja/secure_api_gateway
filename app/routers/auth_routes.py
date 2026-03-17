@@ -79,9 +79,16 @@ def refresh_token(request: Request, request_body: RefreshRequest):
 @limiter.limit("20/minute")
 def logout(request: Request, token: str = Depends(oauth2_scheme)):
 
-    payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-    username = payload.get("sub")
+    try:
+      payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+      username = payload.get("sub")
 
-    store_refresh_token(username, None)  
+      if username is None:
+          raise HTTPException(status_code=401, detail="User not found")
 
-    return {"message": "Logged out"}
+      store_refresh_token(username, None)  
+
+      return {"message": "Logged out"}
+    
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")

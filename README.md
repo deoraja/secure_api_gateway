@@ -1,18 +1,20 @@
-# Authentication API (FastAPI)
+# Secure API Gateway with JWT Authentication and Rate Limiting
 
-A secure authentication module built with **FastAPI**, implementing password hashing and **JWT-based authentication**.  
-The project focuses on building **Backend authentication logic with security best practices**.
+A production-oriented authentication system built with FastAPI, implementing JWT-based authentication with refresh token rotation, rate-limited endpoints, and secure session management.
+
+Designed to demonstrate real-world backend security practices including token lifecycle management and API protection against abuse.
 
 ---
 
 ## Features
 
-- Password hashing using **bcrypt**
-- Secure password verification
-- Password normalization to handle **bcrypt 72-byte limitation**
-- JWT-based authentication
-- Token expiration handling
-- Stateless authentication design
+-  **JWT**-based Authentication (Access + Refresh Tokens)
+-  **Refresh Token Rotation**
+-  **Logout with Token Invalidation**
+-  **Rate Limiting on Authentication Endpoints**
+-  Secure Password Hashing using **bcrypt**
+-  Token Expiration Handling
+-  Stateless Authentication Architecture
 
 ---
 
@@ -115,32 +117,75 @@ def create_access_token(data: dict):
 
 ---
 
-### 5. Token Expiration Handling
+### 5. Refresh Token Rotation
 
 #### Problem
-Without expiration, JWT tokens remain valid indefinitely if leaked.
+If a refresh token is reused or stolen, attackers can continuously generate new access tokens.
 
 #### Solution
-
-```python
-expire = datetime.utcnow() + timedelta(minutes=30)
-```
+- Generate a **new refresh token on every refresh request**
+- Store latest valid token per user
+- Invalidate old refresh tokens automatically
 
 #### Result
-
-- Tokens automatically expire after **30 minutes**
-- Improves security
-- Limits damage from leaked tokens
+- Prevents replay attacks
+- Ensures only the latest token is valid
+- Enhances session security
 
 ---
 
-## Tech Stack
+### 6. Logout with Token Invalidation
 
-- Python
-- FastAPI
-- Passlib
-- bcrypt
-- python-jose (JWT)
+#### Problem
+JWT is stateless → tokens remain valid even after logout.
+
+#### Solution
+- On logout, stored refresh token is cleared
+- Future refresh attempts are rejected
+
+#### Result
+- Immediate session termination
+- Prevents unauthorized reuse of tokens
+
+---
+
+### 7. Rate Limiting (Brute-force Protection)
+
+#### Problem
+Authentication endpoints are vulnerable to:
+- Brute-force attacks  
+- Credential stuffing  
+- API abuse  
+
+#### Solution
+Applied **rate limiting** on critical endpoints:
+
+- `/login` → 5 requests/minute  
+- `/register` → 3 requests/minute  
+- `/refresh` → 10 requests/minute
+- `/logout` → 20 requests/minute  
+
+#### Result
+- Prevents repeated login attempts
+- Protects backend from abuse
+- Improves system stability under attack
+
+---
+
+## Authentication Flow
+
+1. User registers with username and password
+2. Password is hashed using bcrypt and stored securely
+3. User logs in → receives:
+   - Access Token (short-lived)
+   - Refresh Token (long-lived)
+4. Access token is used to access protected APIs
+5. When access token expires:
+   - Client sends refresh token
+   - Server verifies and rotates refresh token
+6. Logout:
+   - Stored refresh token is invalidated
+   - Future refresh attempts are rejected
 
 ---
 
@@ -157,18 +202,22 @@ secure_api_gateway
 │   ├── main.py
 │   │
 │   ├── models
+│   │   ├── refresh_model.py
 │   │   ├── task_model.py
 │   │   └── user_model.py
 │   │
 │   ├── routers
-│   │   ├── task_routes.py
-│   │   └── auth_routes.py
+│   │   ├── auth_routes.py
+│   │   └── task_routes.py
 │   │
 │   ├── services
-│   │   └── auth_service.py
+│   │    ├── auth_service.py
+│   │    └── task_service.py
 │   │
-│   └── utils
-│       └── security.py
+│   └── core
+│        ├── dependencies.py
+│        ├── rate_limiter.py   
+│        └── security.py
 │
 ├── requirements.txt
 └── README.md
@@ -234,8 +283,10 @@ GET | `/` | API health check / welcome message |
 |------|------|------|
 POST | `/register` | Register new user |
 POST | `/login` | Authenticate user and get JWT token |
+POST | `/refresh` | Rotate refresh token and issue new access token |
+POST | `/logout` | Invalidate session |
 
-### Tasks (protected)
+### Tasks 
 
 | Method | Endpoint | Description |
 |------|------|------|
@@ -244,4 +295,3 @@ GET | `/tasks` | Get all tasks |
 GET | `/tasks/{id}` | Get specific task |
 DELETE | `/tasks/{id}` | Delete specific task |
 
-Protected endpoints require **Bearer Token authentication**.
