@@ -1,6 +1,13 @@
 from app.core.security import hash_password, verify_password, normalize_password
 
 users = []
+refresh_store = {}
+
+def store_refresh_token(username, token):
+    refresh_store[username] = token
+
+def verify_refresh_token(username, token):
+    return refresh_store.get(username) == token
 
 def get_user(username: str):
     for u in users:
