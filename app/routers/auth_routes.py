@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
+from app.core.rate_limiter import limiter
 from app.models.user_model import User
 from app.models.refresh_model import RefreshRequest
 from app.services.auth_service import register_user,get_user, store_refresh_token,verify_password, verify_refresh_token
@@ -11,7 +12,8 @@ router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
 @router.post("/register")
-def register(user: User):
+@limiter.limit("3/minute")
+def register(request: Request, user: User):
 
     new_user = register_user(user)
 
@@ -22,8 +24,9 @@ def register(user: User):
 
 
 @router.post("/login")
-def login(form_data: OAuth2PasswordRequestForm = Depends()):
-
+@limiter.limit("5/minute")
+async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends()):
+    
     db_user = get_user(form_data.username)
 
     if not db_user:
@@ -41,9 +44,10 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
     return {"access_token": new_access_token, "refresh_token": new_refresh_token,"token_type": "bearer"}
 
 @router.post("/refresh")
-def refresh_token(request: RefreshRequest):
+@limiter.limit("10/minute")
+def refresh_token(request: Request, request_body: RefreshRequest):
     
-    token = request.refresh_token
+    token = request_body.refresh_token
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
 
@@ -72,7 +76,8 @@ def refresh_token(request: RefreshRequest):
     
 
 @router.post("/logout")
-def logout(token: str = Depends(oauth2_scheme)):
+@limiter.limit("20/minute")
+def logout(request: Request, token: str = Depends(oauth2_scheme)):
 
     payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
     username = payload.get("sub")
